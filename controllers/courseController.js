@@ -20,16 +20,17 @@ export const createCourse = catchAsyncError(async (req, res, next) => {
   if (!title || !description || !category || !createdBy)
     return next(new ErrorHandler("Please add all fields", 400));
 
-  const file = req.files['file'][0];;
+  const file = req.files["file"][0];
   const fileUri = getDataUri(file);
-
+  const myCloud = await cloudinary.v2.uploader.upload(fileUri.content);
   await Course.create({
     title,
     description,
     category,
     createdBy,
     poster: {
-      base64: fileUri.content,
+      public_id: myCloud.public_id,
+      url: myCloud.secure_url,
     },
   });
 
@@ -65,20 +66,29 @@ export const addLecture = catchAsyncError(async (req, res, next) => {
   const course = await Course.findById(id);
   if (!course) return next(new ErrorHandler("Course not found", 404));
 
-  const file = req.files['file'][0];
-  const assignment = req.files['pdf']?req.files['pdf'][0]:null;
+  const file = req.files["file"][0];
+  // const assignment = req.files["pdf"] ? req.files["pdf"][0] : null;
   const fileUri = getDataUri(file);
-  const assignmentUri = assignment?getDataUri(assignment):null;
-
+  // const assignmentUri = assignment ? getDataUri(assignment) : null;
+  const myCloud = await cloudinary.v2.uploader.upload(fileUri.content, {
+    resource_type: "video",
+  });
+  // const myCloudAssignment = await cloudinary.v2.uploader.upload(
+  //   assignmentUri ? assignmentUri.content : null
+  // );
   course.lectures.push({
     title,
     description,
     videos: {
-      base64: fileUri.content,
+      public_id: myCloud.public_id,
+      url: myCloud.secure_url,
     },
-    assignment: {
-      base64: assignmentUri? assignmentUri.content:"No Assignment",
-    },
+    // assignment: {
+    //   public_id: myCloudAssignment
+    //     ? myCloudAssignment.public_id
+    //     : "No Assignment",
+    //   url: myCloudAssignment ? myCloudAssignment.secure_url : "No Assignment",
+    // },
   });
 
   course.numOfVideos = course.lectures.length;
@@ -101,7 +111,6 @@ export const updateLecture = catchAsyncError(async (req, res, next) => {
   const lecture = course.lectures.find((item) => {
     if (item._id.toString() === lectureId.toString()) return item;
   });
-
   // Update lecture with new data..
   if (title) {
     lecture.title = title;
@@ -111,21 +120,31 @@ export const updateLecture = catchAsyncError(async (req, res, next) => {
     lecture.description = description;
   }
 
-  if (req.files && req.files['file']) {
-    const file = req.files['file'][0];
+  if (req.files && req.files["file"]) {
+    const file = req.files["file"][0];
     const fileUri = getDataUri(file);
+    await cloudinary.v2.uploader.destroy(lecture.videos.public_id, {
+      resource_type: "video",
+    });
+    const myCloud = await cloudinary.v2.uploader.upload(fileUri.content, {
+      resource_type: "video",
+    });
     lecture.videos = {
-      base64: fileUri.content,
+      public_id: myCloud.public_id,
+      url: myCloud.secure_url,
     };
   }
 
-  if (req.files && req.files['pdf']) {
-    const assignment = req.files['pdf'][0];
-    const assignmentUri = getDataUri(assignment);
-    lecture.assignment = {
-      base64: assignmentUri.content,
-    };
-  }
+  // if (req.files && req.files["pdf"]) {
+  //   const assignment = req.files["pdf"][0];
+  //   const assignmentUri = getDataUri(assignment);
+  // const myCloud = await cloudinary.v2.uploader.upload(assignmentUri.content);
+  // await cloudinary.v2.uploader.destroy(lecture.assignment.public_id);
+  //   lecture.assignment = {
+  //     public_id: myCloud.public_id,
+  //     url: myCloud.secure_url,
+  //   };
+  // }
 
   await course.save();
 
@@ -143,18 +162,21 @@ export const updateCourse = catchAsyncError(async (req, res, next) => {
   const course = await Course.findById(id);
   if (!course) return next(new ErrorHandler("Course not found", 404));
 
-  if (req.files && req.files['file']) {
-    const file = req.files['file'][0];
+  if (req.files && req.files["file"]) {
+    const file = req.files["file"][0];
     const fileUri = getDataUri(file);
+    await cloudinary.v2.uploader.destroy(course.poster.public_id);
+    const myCloud = await cloudinary.v2.uploader.upload(fileUri.content);
     course.poster = {
-      base64: fileUri.content,
+      public_id: myCloud.public_id,
+      url: myCloud.secure_url,
     };
   }
 
-  title?(course.title = title):null;
-  description?(course.description = description):null;
-  category?(course.category = category):null;
-  createdBy?(course.createdBy = createdBy):null;
+  title ? (course.title = title) : null;
+  description ? (course.description = description) : null;
+  category ? (course.category = category) : null;
+  createdBy ? (course.createdBy = createdBy) : null;
 
   await course.save();
 
@@ -171,6 +193,15 @@ export const deleteCourse = catchAsyncError(async (req, res, next) => {
   const course = await Course.findById(id);
   if (!course) return next(new ErrorHandler("Course not found", 404));
 
+  await cloudinary.v2.uploader.destroy(course.poster.public_id);
+
+  for (let i = 0; i < course.lectures.length; i++) {
+    const singleLecture = course.lectures[i];
+    await cloudinary.v2.uploader.destroy(singleLecture.videos.public_id, {
+      resource_type: "video",
+    });
+  }
+
   await course.deleteOne();
 
   res.status(200).json({
@@ -185,7 +216,13 @@ export const deleteLecture = catchAsyncError(async (req, res, next) => {
 
   const course = await Course.findById(courseId);
   if (!course) return next(new ErrorHandler("Course not found", 404));
+  const lecture = course.lectures.find((item) => {
+    if (item._id.toString() === lectureId.toString()) return item;
+  });
 
+  await cloudinary.v2.uploader.destroy(lecture.videos.public_id, {
+    resource_type: "video",
+  });
   course.lectures = course.lectures.filter((item) => {
     if (item._id.toString() !== lectureId.toString()) return item;
   });

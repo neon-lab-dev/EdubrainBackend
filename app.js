@@ -4,8 +4,6 @@ import ErrorMiddleware from "./middlewares/Error.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 
-
-
 config({
   path: "./config/config.env",
 });
@@ -13,10 +11,10 @@ config({
 const app = express();
 
 //using middleware
-const corsOptions = { 
+const corsOptions = {
   origin: "http://localhost:3000",
   optionsSuccessStatus: 200, // Corrected property name
-  credentials: true
+  credentials: true,
 };
 
 app.use(cors(corsOptions));
@@ -36,6 +34,9 @@ import Submissions from "./routes/submissionRoute.js";
 app.use("/api/v1", course);
 app.use("/api/v1", user);
 app.use("/api/v1", Submissions);
+app.get("/", (req, res) => {
+  res.send("Welcome to EduBrain. The server is live.");
+});
 
 export default app;
 

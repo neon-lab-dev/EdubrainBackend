@@ -23,7 +23,11 @@ const schema = new mongoose.Schema({
         required: true,
       },
       videos: {
-        base64: {
+        public_id: {
+          type: String,
+          required: true,
+        },
+        url: {
           type: String,
           required: true,
         },
@@ -37,7 +41,11 @@ const schema = new mongoose.Schema({
     },
   ],
   poster: {
-    base64: {
+    public_id: {
+      type: String,
+      required: true,
+    },
+    url: {
       type: String,
       required: true,
     },
